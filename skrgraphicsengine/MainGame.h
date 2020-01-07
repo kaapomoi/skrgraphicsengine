@@ -2,6 +2,7 @@
 #include <SDL/SDL.h>
 #include <GL/glew.h>
 #include <iostream>
+#include <vector>
 
 #include "GLSLProgram.h"
 #include "GLTexture.h"
@@ -35,8 +36,7 @@ private:
 	int _screenHeight;
 	GameState _gameState;
 
-	Sprite _sprite;
-	GLTexture _playerTexture;
+	std::vector<Sprite*> _sprites;
 
 	GLSLProgram _colorProgram;
 

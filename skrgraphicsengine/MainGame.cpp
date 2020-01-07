@@ -1,6 +1,6 @@
 #include "MainGame.h"
 #include "Errors.h"
-#include "ImageLoader.h"
+
 
 MainGame::MainGame() :
 	_window(nullptr),
@@ -21,9 +21,13 @@ void MainGame::run()
 {
 	initSystems();
 
-	_sprite.init(-1.0f, -1.0f, 2.0f, 2.0f);
-	
-	_playerTexture = ImageLoader::loadPNG("Textures/tilesetsingular/tile023.png");
+	_sprites.push_back(new Sprite());
+	_sprites.back()->init(-1.0f, -1.0f, 1.0f, 1.0f, "Textures/tilesetsingular/tile023.png");
+
+	_sprites.push_back(new Sprite());
+	_sprites.back()->init(0.0f, -1.0f, 1.0f, 1.0f, "Textures/tilesetsingular/tile024.png");
+
+	//_playerTexture = ImageLoader::loadPNG("Textures/tilesetsingular/tile023.png");
 
 	gameLoop();
 }
@@ -107,7 +111,6 @@ void MainGame::drawGame()
 
 	_colorProgram.use();
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, _playerTexture.id);
 	GLint textureLocation = _colorProgram.getUniformLocation("mySampler");
 	glUniform1i(textureLocation, 0);
 
@@ -115,7 +118,10 @@ void MainGame::drawGame()
 	GLuint timeLocation = _colorProgram.getUniformLocation("time");
 	glUniform1f(timeLocation, _time);
 
-	_sprite.draw();
+	for (int i = 0; i < _sprites.size(); i++)
+	{
+		_sprites[i]->draw();
+	}
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	_colorProgram.unuse();
