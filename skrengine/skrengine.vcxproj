@@ -19,26 +19,38 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Camera2D.cpp" />
     <ClCompile Include="Errors.cpp" />
     <ClCompile Include="GLSLProgram.cpp" />
     <ClCompile Include="ImageLoader.cpp" />
+    <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="IOManager.cpp" />
     <ClCompile Include="picoPNG.cpp" />
     <ClCompile Include="ResourceManager.cpp" />
+    <ClCompile Include="skrengine.cpp" />
     <ClCompile Include="Sprite.cpp" />
+    <ClCompile Include="SpriteBatch.cpp" />
     <ClCompile Include="TextureCache.cpp" />
+    <ClCompile Include="Timing.cpp" />
+    <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Camera2D.h" />
     <ClInclude Include="Errors.h" />
     <ClInclude Include="GLSLProgram.h" />
     <ClInclude Include="GLTexture.h" />
     <ClInclude Include="ImageLoader.h" />
+    <ClInclude Include="InputManager.h" />
     <ClInclude Include="IOManager.h" />
     <ClInclude Include="picoPNG.h" />
     <ClInclude Include="ResourceManager.h" />
+    <ClInclude Include="skrengine.h" />
     <ClInclude Include="Sprite.h" />
+    <ClInclude Include="SpriteBatch.h" />
     <ClInclude Include="TextureCache.h" />
+    <ClInclude Include="Timing.h" />
     <ClInclude Include="Vertex.h" />
+    <ClInclude Include="Window.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -102,6 +114,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)deps/include/;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;$(SolutionDir)deps/lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -157,6 +171,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;opengl32.lib;glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>

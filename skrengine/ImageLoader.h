@@ -1,11 +1,13 @@
 #pragma once
 #include "GLTexture.h"
-
 #include <string>
 
-class ImageLoader
+namespace skrengine
 {
-public:
-	static GLTexture loadPNG(std::string filePath);
-};
+	class ImageLoader
+	{
+	public:
+		static GLTexture loadPNG(std::string filePath);
+	};
 
+}

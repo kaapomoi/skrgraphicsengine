@@ -6,6 +6,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "skrengine", "skrengine\skrengine.vcxproj", "{6EB59D7D-850D-4690-9A17-390DD0339A06}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "skrpixelgame", "skrpixelgame\skrpixelgame.vcxproj", "{02E5962B-CA54-4D7F-97EB-2C6B7C077C3F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6EB59D7D-850D-4690-9A17-390DD0339A06} = {6EB59D7D-850D-4690-9A17-390DD0339A06}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
