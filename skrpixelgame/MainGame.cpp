@@ -64,7 +64,7 @@ void MainGame::initSystems()
 
 void MainGame::initLevel()
 {
-	_levels.push_back(new Level("Data/Level/Level1.dat"));
+	_levels.push_back(new Level("Data/Level/Level1.dat", "Data/Level/Level1bg.dat"));
 
 	_currentLevel = 0;
 	_player = new Player();
@@ -132,7 +132,7 @@ void MainGame::gameLoop()
 		drawGame();
 
 		_fps = fpsLimiter.end();
-		std::cout << _fps << "\n";
+		//std::cout << _fps << "\n";
 	}
 }
 

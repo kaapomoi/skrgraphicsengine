@@ -11,7 +11,7 @@ class Level
 {
 public:
 	// Load the level
-	Level(const std::string& fileName);
+	Level(const std::string& fileName, const std::string& bgFileName);
 	~Level();
 
 	void draw();
@@ -21,11 +21,12 @@ public:
 	int getHeight() const { return _levelData.size(); }
 	int getNumHumans() const { return _numHumans; }
 	const std::vector<std::string>& getLevelData() const { return _levelData; }
+	const std::vector<std::string>& getBGLevelData() const { return _bgLevelData; }
 	glm::vec2 getPlayerStartPos() const { return _playerStartPosition; }
 	const std::vector<glm::vec2>& getEnemiesStartPos() const { return _enemyStartPositions; }
 private:
 	std::vector<std::string> _levelData;
-
+	std::vector<std::string> _bgLevelData;
 
 	int _numHumans;
 	skrengine::SpriteBatch _spriteBatch;
