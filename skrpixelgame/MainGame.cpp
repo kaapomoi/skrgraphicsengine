@@ -1,25 +1,47 @@
 #include "MainGame.h"
 
+const float HUMAN_SPEED = 0.5f;
+const float ENEMY_SPEED = 0.6f;
+const float PLAYER_SPEED = 1.0f;
+
 MainGame::MainGame() :
-	_screenWidth(800),
-	_screenHeight(800),
+	_screenWidth(1200),
+	_screenHeight(900),
 	_gameState(GameState::PLAY),
-	_time(0.0f),
-	_maxFPS(144.0f),
-	_fps(0.0f)
+	_fps(0),
+	_maxFPS(60),
+	_time(0),
+	_currentLevel(0),
+	_player(nullptr),
+	_numHumansKilled(0),
+	_numEnemiesKilled(0)
 {
-	_camera2D.init(_screenWidth, _screenHeight);
+	// todo
 }
 
 MainGame::~MainGame()
 {
+	for (int i = 0; i < _levels.size(); i++)
+	{
+		delete _levels[i];
+	}
 
+	for (int i = 0; i < _humans.size(); i++)
+	{
+		delete _humans[i];
+	}
+
+	for (int i = 0; i < _enemies.size(); i++)
+	{
+		delete _enemies[i];
+	}
 }
 
 void MainGame::run()
 {
 	initSystems();
-	//_playerTexture = ImageLoader::loadPNG("Textures/tilesetsingular/tile023.png");
+
+	initLevel();
 
 	gameLoop();
 }
@@ -27,69 +49,251 @@ void MainGame::run()
 void MainGame::initSystems()
 {
 	skrengine::init();
-	
-	_window.create("Pixel game", _screenWidth, _screenHeight, 0);
+
+	_window.create("Pixel Game", _screenWidth, _screenHeight, 0);
+	glClearColor(0.4f, 0.4f, 0.4f, 1.0f);
 
 	initShaders();
 
-	_spriteBatch.init();
-	_fpsLimiter.init(_maxFPS);
+	_agentSpriteBatch.init();
+
+	_camera2D.init(_screenWidth, _screenHeight);
+
+	SDL_GL_SetSwapInterval(false);
+}
+
+void MainGame::initLevel()
+{
+	_levels.push_back(new Level("Data/Level/Level1.dat"));
+
+	_currentLevel = 0;
+	_player = new Player();
+	_player->init(PLAYER_SPEED, _levels[_currentLevel]->getPlayerStartPos(), 150, &_inputManager, "Textures/goodtiles/wizard.png", &_camera2D, &_projectiles);
+
+	_humans.push_back(_player);
+
+	std::mt19937 randomEngine;
+	randomEngine.seed(time(NULL));
+	std::uniform_int_distribution<int> randX(2, _levels[_currentLevel]->getWidth() - 2);
+	std::uniform_int_distribution<int> randY(2, _levels[_currentLevel]->getHeight() - 2);
+
+	
+	for (int i = 0; i < _levels[_currentLevel]->getNumHumans(); i++)
+	{
+		_humans.push_back(new Human());
+		glm::vec2 pos(randX(randomEngine) * TILE_WIDTH, randY(randomEngine) * TILE_WIDTH);
+		_humans.back()->init(HUMAN_SPEED, pos, "Textures/goodtiles/bandit.png", 20);
+	}
+	
+	//Add enemies
+	const std::vector<glm::vec2>& enemyPositons = _levels[_currentLevel]->getEnemiesStartPos();
+	for (int i = 0; i < enemyPositons.size(); i++)
+	{
+		_enemies.push_back(new Enemy());
+		_enemies.back()->init(ENEMY_SPEED, enemyPositons[i], "Textures/goodtiles/ogre.png", 100);
+	}
+
+	// Fire rate, no of proj, spread, damage, speed 
+	_player->addStaff(new Staff("Atlatl", 20, 1, degToRad(3.f), 30, 10.f));
+
+	_player->addStaff(new Staff("Morghoul", 30, 10, degToRad(20.f), 15, 10.f));
+
+	_player->addStaff(new Staff("Staiel", 5, 1, degToRad(5.0f), 40, 15.f));
 }
 
 void MainGame::initShaders()
 {
-	_colorProgram.compileShaders("Shaders/colorShading.vert", "Shaders/colorShading.frag");
-	_colorProgram.addAttribute("vertexPosition");
-	_colorProgram.addAttribute("vertexColor");
-	_colorProgram.addAttribute("vertexUV");
-	_colorProgram.linkShaders();
+	_textureProgram.compileShaders("Shaders/colorShading.vert", "Shaders/colorShading.frag");
+	_textureProgram.addAttribute("vertexPosition");
+	_textureProgram.addAttribute("vertexColor");
+	_textureProgram.addAttribute("vertexUV");
+	_textureProgram.linkShaders();
 }
 
 void MainGame::gameLoop()
 {
-	while (_gameState != GameState::EXIT)
+	skrengine::FPSLimiter fpsLimiter;
+	fpsLimiter.init(60);
+
+	while (_gameState == GameState::PLAY)
 	{
-		_fpsLimiter.begin();
+		fpsLimiter.begin();
+
+		checkVictory();
 
 		processInput();
-		_time += 0.01f;
 
+		updateAgents();
+
+		updateProjectiles();
+
+		_camera2D.setPosition(_player->getPosition());
 		_camera2D.update();
+		drawGame();
 
-		for (int i = 0; i < _projectiles.size();)
+		_fps = fpsLimiter.end();
+		std::cout << _fps << "\n";
+	}
+}
+
+void MainGame::updateAgents()
+{
+	// Update Humans
+	for (int i = 0; i < _humans.size(); i++)
+	{
+		_humans[i]->update(_levels[_currentLevel]->getLevelData(), _humans, _enemies);
+	}
+
+	// Update Enemies
+	for (int i = 0; i < _enemies.size(); i++)
+	{
+		_enemies[i]->update(_levels[_currentLevel]->getLevelData(), _humans, _enemies);
+	}
+
+	// Update enemy collisions
+	for (int i = 0; i < _enemies.size(); i++)
+	{
+		// Collide with enemies
+		for (int j = i + 1; j < _enemies.size(); j++)
 		{
-			if (_projectiles[i].update())
+			_enemies[i]->collideWithAgent(_enemies[j]);
+		}
+		// Collide with humans
+		for (int j = 1; j < _humans.size(); j++)
+		{
+			// If we collided with a human
+			if (_enemies[i]->collideWithAgent(_humans[j])) 
 			{
+				_enemies.push_back(new Enemy());
+				_enemies.back()->init(ENEMY_SPEED, _humans[j]->getPosition(), "Textures/goodtiles/ogre.png", 50);
+				delete _humans[j];
+				_humans[j] = _humans.back();
+				_humans.pop_back();
+			}	
+		}
+
+		// Collide with player
+		if (_enemies[i]->collideWithAgent(_player))
+		{
+			// Deal damage to player
+			//skrengine::fatalError("you lose");
+		}
+	}
+
+	// Update human collisions
+	for (int i = 0; i < _humans.size(); i++)
+	{
+		// Collide with other humans
+		for (int j = i+1; j < _humans.size(); j++)
+		{
+			_humans[i]->collideWithAgent(_humans[j]);
+		}
+	}
+}
+
+void MainGame::updateProjectiles()
+{
+	// Collide with level
+	for (int i = 0; i < _projectiles.size();)
+	{
+		if (_projectiles[i].update(_levels[_currentLevel]->getLevelData())) {
+			_projectiles[i] = _projectiles.back();
+			_projectiles.pop_back();
+		}
+		else
+		{
+			i++;
+		}
+	}
+
+	bool wasProjectileRemoved;
+
+	// Collide with humans and enemies
+	for (int i = 0; i < _projectiles.size(); i++)
+	{
+		wasProjectileRemoved = false;
+		for (int j = 0; j < _enemies.size();)
+		{
+			if (_projectiles[i].collideWithAgent(_enemies[j]))
+			{
+				// Damage enemy and kill it if its out of health
+				if (_enemies[j]->applyDamage(_projectiles[i].getDamage()))
+				{
+					delete _enemies[j];
+					_enemies[j] = _enemies.back();
+					_enemies.pop_back();
+					_numEnemiesKilled++;
+				}
+				else
+				{
+					j++;
+				}
+
+				// Remove projectile
 				_projectiles[i] = _projectiles.back();
 				_projectiles.pop_back();
+				wasProjectileRemoved = true; // Make sure we dont skip a projectile
+				break;
 			}
 			else
 			{
-				i++;
+				j++;
 			}
 		}
 
-		drawGame();
-
-		_fps = _fpsLimiter.end();
-
-		static int frameCount = 0;
-		frameCount++;
-		if (frameCount >= 1000)
+		// Loop through humans
+		if (!wasProjectileRemoved)
 		{
-			std::cout << _fps << "fps\n";
-			frameCount = 0;
+			for (int j = 1; j < _humans.size();)
+			{
+				if (_projectiles[i].collideWithAgent(_humans[j]))
+				{
+					// Damage enemy and kill it if its out of health
+					if (_humans[j]->applyDamage(_projectiles[i].getDamage()))
+					{
+						delete _humans[j];
+						_humans[j] = _humans.back();
+						_humans.pop_back();
+						_numHumansKilled++;
+					}
+					else
+					{
+						j++;
+					}
+
+					// Remove projectile
+					_projectiles[i] = _projectiles.back();
+					_projectiles.pop_back();
+					wasProjectileRemoved = true; // Make sure we dont skip a projectile
+					break;
+				}
+				else
+				{
+					j++;
+				}
+			}
 		}
+
+	}
+}
+
+void MainGame::checkVictory()
+{
+	if (_enemies.empty())
+	{
+		std::printf("***  You win! *** \n Youkilled %d humans and %d enemies. There are %d/%d civilians remaining",
+			_numHumansKilled, _numEnemiesKilled, _humans.size() - 1, _levels[_currentLevel]->getNumHumans());
+
+
+		skrengine::fatalError("");
 	}
 }
 
 void MainGame::processInput()
 {
 	SDL_Event evnt;
-
-	const float CAMERA_SPEED = _screenWidth/32;
-	const float SCALE_SPEED = 0.025f;
-
+	
+	// Loops until no events to process
 	while (SDL_PollEvent(&evnt))
 	{
 		switch (evnt.type) 
@@ -115,45 +319,6 @@ void MainGame::processInput()
 		}
 	}
 
-	if (_inputManager.isKeyPressed(SDLK_w))
-	{
-		_camera2D.setPosition(_camera2D.getPosition() + glm::vec2(0.0f, -CAMERA_SPEED));
-	}
-	if (_inputManager.isKeyPressed(SDLK_s))
-	{
-		_camera2D.setPosition(_camera2D.getPosition() + glm::vec2(0.0f, CAMERA_SPEED));
-	}
-	if (_inputManager.isKeyPressed(SDLK_a))
-	{
-		_camera2D.setPosition(_camera2D.getPosition() + glm::vec2(CAMERA_SPEED, 0.0f));
-	}
-	if (_inputManager.isKeyPressed(SDLK_d))
-	{
-		_camera2D.setPosition(_camera2D.getPosition() + glm::vec2(-CAMERA_SPEED, 0.0f));
-	}
-	if (_inputManager.isKeyPressed(SDLK_q))
-	{
-		_camera2D.setScale(_camera2D.getScale() + -SCALE_SPEED);
-	}
-	if (_inputManager.isKeyPressed(SDLK_e))
-	{
-		_camera2D.setScale(_camera2D.getScale() + SCALE_SPEED);
-	}
-
-	if (_inputManager.isKeyPressed(SDL_BUTTON_LEFT))
-	{
-		glm::vec2 mousecoords = _inputManager.getMouseCoords();
-		mousecoords = _camera2D.convertScreenToWorld(mousecoords);
-		std::cout << mousecoords.x << ", " << mousecoords.y << "\n";
-
-		glm::vec2 playerPosition(0.0f);
-		glm::vec2 direction = mousecoords - playerPosition;
-		direction = glm::normalize(direction);
-
-		_projectiles.emplace_back(playerPosition, direction, 1.f, 1000);
-
-	}
-
 }
 
 void MainGame::drawGame()
@@ -163,61 +328,51 @@ void MainGame::drawGame()
 	// Clear the Color and depth buffers
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	_colorProgram.use();
+	// Bind shaders
+	_textureProgram.use();
+
+	//Drawing
 	glActiveTexture(GL_TEXTURE0);
-	GLint textureLocation = _colorProgram.getUniformLocation("mySampler");
-	glUniform1i(textureLocation, 0);
 
-	//GLuint timeLocation = _colorProgram.getUniformLocation("time");
-	//glUniform1f(timeLocation, _time);
+	// Shader uses texture 0
+	GLint textureUniform = _textureProgram.getUniformLocation("mySampler");
+	glUniform1i(textureUniform, 0);
 
-	GLuint pLocation = _colorProgram.getUniformLocation("P");
-	glm::mat4 cameraMatrix = _camera2D.getCameraMatrix();
-	glUniformMatrix4fv(pLocation, 1, GL_FALSE, &(cameraMatrix[0][0]));
+	// Get camera matrix
+	glm::mat4 projectionMatrix = _camera2D.getCameraMatrix();
+	GLint pUniform = _textureProgram.getUniformLocation("P");
+	glUniformMatrix4fv(pUniform, 1, GL_FALSE, &projectionMatrix[0][0]);
 
-	_spriteBatch.begin();
+	_levels[_currentLevel]->draw();
 
-	
-	glm::vec4 pos(0.0f, 0.0f, 16.0f, 16.0f);
-	glm::vec4 uv(0.0f, 0.0f, 1.0f, 1.0f);
+	// Draw the agents
+	_agentSpriteBatch.begin();
 
-	static skrengine::GLTexture texture = skrengine::ResourceManager::getTexture("Textures/tilesetsingular/tile023.png");
-	skrengine::Color color;
-	color.r = 255;
-	color.g = 255;
-	color.b = 255;
-	color.a = 255;
-
-	_spriteBatch.draw(pos, uv, texture.id, color, 0.0f);
-
+	for (int i = 0; i < _humans.size(); i++)
+	{
+		_humans[i]->draw(_agentSpriteBatch);
+	}
+	for (int i = 0; i < _enemies.size(); i++)
+	{
+		_enemies[i]->draw(_agentSpriteBatch);
+	}
 	for (int i = 0; i < _projectiles.size(); i++)
 	{
-		_projectiles[i].draw(_spriteBatch);
+		_projectiles[i].draw(_agentSpriteBatch);
 	}
 
-	_spriteBatch.end();
+	_agentSpriteBatch.end();
+	_agentSpriteBatch.renderBatch();
 
-	_spriteBatch.renderBatch();
+	//static skrengine::GLTexture texture = skrengine::ResourceManager::getTexture("Textures/tilesetsingular/tile023.png");
 
+	_textureProgram.unuse();
 
-	glBindTexture(GL_TEXTURE_2D, 0);
-	_colorProgram.unuse();
-	
 	_window.swapBuffer();
 }
 
-/*
-void MainGame::calculateFPS()
+float MainGame::degToRad(float deg)
 {
-	static Uint32 fpsFrames = 0;   // Frames passed since the last recorded fps.
-	static Uint32 fpsLastTime = SDL_GetTicks();
-
-	fpsFrames++;
-	if (SDL_GetTicks() >= 1000U && fpsLastTime <= SDL_GetTicks() - 1000U) {  // Update once per second = 1000
-		fpsLastTime = SDL_GetTicks();
-		_fps = fpsFrames;
-		std::cout << _fps << "   \r";  // a couple spaces followed by a \r makes it stay on the same line nicely
-		fpsFrames = 0;
-	}
+	float rad = (deg * 3.1415926535) / 180;
+	return rad;
 }
-*/
